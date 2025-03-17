@@ -15,7 +15,7 @@ from torch.utils import data
 
 class SalObjDataset(data.Dataset):
 
-    def __init__(self, image_root, depth_root, gt_root, trainsize):
+    def __init__(self, image_root, dataset, trainsize, mode):
         """
         :param image_root: The path of RGB training images.
         :param depth_root: The path of depth training images.
@@ -23,12 +23,66 @@ class SalObjDataset(data.Dataset):
         :param trainsize: The size of training images.
         """
         self.trainsize = trainsize
-        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg')]
-        self.depths = [depth_root + f for f in os.listdir(depth_root) if f.endswith('.jpg') or f.endswith('.png')]
-        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.jpg') or f.endswith('.png')]
-        self.images = sorted(self.images)
-        self.depths = sorted(self.depths)
-        self.gts = sorted(self.gts)
+        self.images = []
+        self.depths = []
+        self.gts = []
+        if dataset == 'rdvs':
+            lable_rgb = 'rgb'
+            lable_depth = 'Depth'
+            lable_gt = 'ground-truth'
+            lable_flow = 'FLOW'
+
+            if mode == 'train':
+                data_dir = os.path.join(image_root, 'RDVS/train')
+            else:
+                data_dir = os.path.join(image_root, 'RDVS/test')
+        elif dataset == 'vidsod_100':
+            lable_rgb = 'rgb'
+            lable_depth = 'depth'
+            lable_gt = 'gt'
+            lable_flow = 'flow'
+            
+            if mode == 'train':
+                data_dir = os.path.join(image_root, 'vidsod_100/train')
+            else:
+                data_dir = os.path.join(image_root, 'vidsod_100/test')
+        elif dataset == 'dvisal':
+            lable_rgb = 'RGB'
+            lable_depth = 'Depth'
+            lable_gt = 'GT'
+            lable_flow = 'flow'
+
+            data_dir = os.path.join(image_root, 'DViSal_dataset/data')
+
+            if mode == 'train':
+                dvi_mode = 'train'
+            else:
+                dvi_mode = 'test_all'
+        else:
+            raise 'dataset is not support now.'
+        
+        if dataset == 'dvisal':
+            with open(os.path.join(data_dir, '../', dvi_mode+'.txt'), mode='r') as f:
+                subsets = set(f.read().splitlines())
+        else:
+            subsets = os.listdir(data_dir)
+        
+        for video in subsets:
+            video_path = os.path.join(data_dir, video)
+            rgb_path = os.path.join(video_path, lable_rgb)
+            depth_path = os.path.join(video_path, lable_depth)
+            gt_path = os.path.join(video_path, lable_gt)
+            # flow_path = os.path.join(video_path, lable_flow)
+            frames = os.listdir(rgb_path)
+            frames = sorted(frames)
+            for frame in frames[:-1]:
+                rgb_file_path = os.path.join(rgb_path, frame)
+                if os.path.isfile(rgb_file_path):
+                    self.images.append(rgb_file_path)
+                    self.gts.append(os.path.join(gt_path, frame.replace('.jpg', '.png')))
+                    self.depths.append(os.path.join(gt_path, frame.replace('.jpg', '.png')))
+
+
         self.filter_files()
         self.size = len(self.images)
         self.img_transform = transforms.Compose([
@@ -112,8 +166,8 @@ def randomRotation(image, depth, gt):
     return image, depth, gt
 
 
-def get_loader(image_root, depth_root, gt_root, batchsize, trainsize, shuffle=True, num_workers=6, pin_memory=True):
-    dataset = SalObjDataset(image_root, depth_root, gt_root, trainsize)
+def get_loader(image_root, dataset, batchsize, trainsize, mode, shuffle=True, num_workers=6, pin_memory=True):
+    dataset = SalObjDataset(image_root, dataset, trainsize, mode)
     data_loader = data.DataLoader(dataset=dataset,
                                   batch_size=batchsize,
                                   shuffle=shuffle,

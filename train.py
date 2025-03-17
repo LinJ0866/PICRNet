@@ -29,7 +29,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu_id
 GPU_NUMS = torch.cuda.device_count()
 
 # Logs
-save_path = create_folder(opt.save_path)
+save_path = create_folder(os.path.join(opt.save_path, opt.dataset))
 logging.basicConfig(filename=save_path + 'log.log',
                     format='[%(asctime)s-%(filename)s-%(levelname)s:%(message)s]',
                     level=logging.INFO,
@@ -39,10 +39,10 @@ logging.info(f'Config--epoch:{opt.epoch}; lr:{opt.lr}; batch_size:{opt.batchsize
 writer = SummaryWriter(save_path + 'summary')
 
 # load data
-train_loader, train_num = get_loader(opt.rgb_root, opt.depth_root, opt.gt_root, opt.batchsize, opt.trainsize)
-val_loader, val_num = get_loader(opt.val_rgb_root, opt.val_depth_root, opt.val_gt_root, 1, opt.trainsize)
-print(f'Loading data, including {train_num} training images and {val_num} validation images.')
-logging.info(f'Loading data, including {train_num} training images and {val_num} validation images.')
+train_loader, train_num = get_loader(opt.rgb_root, opt.dataset, opt.batchsize, opt.trainsize, 'train')
+# val_loader, val_num = get_loader(opt.val_rgb_root, opt.val_depth_root, opt.val_gt_root, 1, opt.trainsize)
+print(f'Loading data, including {train_num} training images.')
+logging.info(f'Loading data, including {train_num} training images.')
 # model
 model = PICR_Net()
 if GPU_NUMS == 1:
@@ -135,7 +135,7 @@ def train(train_loader, model, optimizer, epoch, save_path):
         writer.add_scalar('Loss-train-avg', loss_avg, global_step=epoch)
 
         if  (epoch % 5 == 0 or epoch == opt.epoch):
-            torch.save(model.state_dict(), save_path + 'PICR_Net_epoch_{}.pth'.format(epoch))
+            torch.save(state, save_path + 'PICR_Net_latest.pth')
 
     except KeyboardInterrupt:
         print('Keyboard Interrupt: save model and exit.')
@@ -144,7 +144,7 @@ def train(train_loader, model, optimizer, epoch, save_path):
             'state_dict': model.state_dict(),
             'optimizer': optimizer.state_dict()
         }
-        torch.save(state, save_path + 'PICR_Net_epoch_{}_checkpoint.pth.tar'.format(epoch + 1))
+        torch.save(state, save_path + 'PICR_Net_latest.pth')
         print('Save checkpoint successfully!')
         raise
 
@@ -154,24 +154,24 @@ best_loss = 100
 best_epoch = 1
 
 
-def test(val_loader, model, epoch, save_path):
-    global best_loss, best_epoch
-    model.eval()
-    with torch.no_grad():
-        loss_sum = 0
-        for i, (image, depth, gt) in enumerate(val_loader, start=1):
-            image = image.cuda()
-            depth = depth.cuda()
-            gt = gt.cuda()
-            pre = model(image, depth)
-            loss = loss_bce_ssim_iou(pre, gt)
-            loss_sum += loss.detach()
-        loss_epoch = loss_sum / val_num
-        if loss_epoch < best_loss:
-            best_loss, best_epoch = loss_epoch, epoch
-            torch.save(model.state_dict(), save_path + 'PICR_Net_epoch_best.pth')
-        print(f'Epoch [{epoch:03d}/{opt.epoch:03d}]:Loss_val={loss_epoch:.4f},'
-              f' Best_loss={best_loss:.4f}, Best_epoch:{best_epoch:03d}')
+# def test(val_loader, model, epoch, save_path):
+#     global best_loss, best_epoch
+#     model.eval()
+#     with torch.no_grad():
+#         loss_sum = 0
+#         for i, (image, depth, gt) in enumerate(val_loader, start=1):
+#             image = image.cuda()
+#             depth = depth.cuda()
+#             gt = gt.cuda()
+#             pre = model(image, depth)
+#             loss = loss_bce_ssim_iou(pre, gt)
+#             loss_sum += loss.detach()
+#         loss_epoch = loss_sum / val_num
+#         if loss_epoch < best_loss:
+#             best_loss, best_epoch = loss_epoch, epoch
+#             torch.save(model.state_dict(), save_path + 'PICR_Net_epoch_best.pth')
+#         print(f'Epoch [{epoch:03d}/{opt.epoch:03d}]:Loss_val={loss_epoch:.4f},'
+#               f' Best_loss={best_loss:.4f}, Best_epoch:{best_epoch:03d}')
 
 
 if __name__ == '__main__':

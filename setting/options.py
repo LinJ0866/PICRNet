@@ -22,8 +22,7 @@ parser.add_argument('--load', type=str, default=None, help='train from checkpoin
 parser.add_argument('--gpu_id', type=str, default='4', help='the gpu id')
 # training dataset
 parser.add_argument('--rgb_root', type=str, default='./RGBD_dataset/train/RGB/')
-parser.add_argument('--depth_root', type=str, default='./RGBD_dataset/train/depth/')
-parser.add_argument('--gt_root', type=str, default='./RGBD_dataset/train/GT/')
+parser.add_argument('--dataset', type=str, choices=['rdvs', 'vidsod_100', 'dvisal'])
 
 # validation dataset
 parser.add_argument('--val_rgb_root', type=str, default='./RGBD_dataset/val/RGB/')
